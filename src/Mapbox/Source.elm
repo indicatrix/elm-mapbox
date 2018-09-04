@@ -1,4 +1,4 @@
-module Mapbox.Source exposing (Source, SourceOption, raster, tileSize, rasterFromUrl, RasterSource, scheme, Scheme(..), rasterDEMMapbox, rasterDEMTerrarium, geoJSONFromUrl, geoJSONFromValue, GeoJSONSource, buffer, tolerance, cluster, clusterRadius, lineMetrics, Coords, image, video, staticCanvas, animatedCanvas, bounds, minzoom, maxzoom, attribution, encode, getId, Id, Url, vector, vectorFromUrl, VectorSource)
+module Mapbox.Source exposing (Coords, GeoJSONSource, Id, RasterSource, Scheme(..), Source, SourceOption, Url, VectorSource, animatedCanvas, attribution, bounds, buffer, cluster, clusterRadius, encode, generateIds, geoJSONFromUrl, geoJSONFromValue, getId, image, lineMetrics, maxzoom, minzoom, raster, rasterDEMMapbox, rasterDEMTerrarium, rasterFromUrl, scheme, staticCanvas, tileSize, tolerance, vector, vectorFromUrl, video)
 
 {-|
 
@@ -27,7 +27,7 @@ module Mapbox.Source exposing (Source, SourceOption, raster, tileSize, rasterFro
 
 ### GeoJSON
 
-@docs geoJSONFromUrl, geoJSONFromValue, GeoJSONSource, buffer, tolerance, cluster, clusterRadius, lineMetrics
+@docs geoJSONFromUrl, geoJSONFromValue, GeoJSONSource, buffer, tolerance, cluster, clusterRadius, lineMetrics, generateIds
 
 
 ### Image, Video & Canvas
@@ -120,7 +120,7 @@ getId (Source k _) =
 -}
 bounds : LngLat -> LngLat -> SourceOption any
 bounds sw ne =
-    SourceOption "bounds" (Json.Encode.list [ Json.Encode.float sw.lng, Json.Encode.float sw.lat, Json.Encode.float sw.lng, Json.Encode.float sw.lat ])
+    SourceOption "bounds" (Json.Encode.list Json.Encode.float [ sw.lng, sw.lat, sw.lng, sw.lat ])
 
 
 {-| Minimum zoom level for which tiles are available, as in the TileJSON spec.
@@ -165,11 +165,19 @@ tolerance float =
     SourceOption "tolerance" (Json.Encode.float float)
 
 
-{-| If the data is a collection of point features, setting this to true clusters the points by radius into groups.
+{-| If the data is a collection of point features, setting this clusters the points by radius into groups.
+
+Cluster groups become new Point features in the source with additional properties:
+
+  - `cluster` Is `True` if the point is a cluster
+  - `cluster_id` A unqiue id for the cluster.
+  - `point_count` Number of original points grouped into this cluster
+  - `point_count_abbreviated` An abbreviated point count
+
 -}
-cluster : Bool -> SourceOption GeoJSONSource
+cluster : SourceOption GeoJSONSource
 cluster =
-    Json.Encode.bool >> SourceOption "cluster"
+    Json.Encode.bool True |> SourceOption "cluster"
 
 
 {-| Radius of each cluster if clustering is enabled. A value of 512 indicates a radius equal to the width of a tile.
@@ -193,11 +201,11 @@ lineMetrics =
     Json.Encode.bool >> SourceOption "lineMetrics"
 
 
-{-| Whether to generate ids for the geojson features. When enabled, the feature.id property will be auto assigned based on its index in the features array, over-writing any previous values.
+{-| When set, the feature.id property will be auto assigned based on its index in the features array, over-writing any previous values.
 -}
-generateId : Bool -> SourceOption GeoJSONSource
-generateId =
-    Json.Encode.bool >> SourceOption "generateId"
+generateIds : SourceOption GeoJSONSource
+generateIds =
+    Json.Encode.bool True |> SourceOption "generateId"
 
 
 {-| Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
@@ -229,7 +237,7 @@ This takes an array of one or more tile source URLs, as in the TileJSON spec.
 -}
 vector : Id -> List Url -> List (SourceOption VectorSource) -> Source
 vector id urls options =
-    ( "tiles", Json.Encode.list (List.map Json.Encode.string urls) )
+    ( "tiles", Json.Encode.list Json.Encode.string urls )
         :: ( "type", Json.Encode.string "vector" )
         :: List.map (\(SourceOption k v) -> ( k, v )) options
         |> Json.Encode.object
@@ -247,7 +255,7 @@ rasterFromUrl id url =
 -}
 raster : Id -> List Url -> List (SourceOption RasterSource) -> Source
 raster id urls options =
-    ( "tiles", Json.Encode.list (List.map Json.Encode.string urls) )
+    ( "tiles", Json.Encode.list Json.Encode.string urls )
         :: ( "type", Json.Encode.string "raster" )
         :: List.map (\(SourceOption k v) -> ( k, v )) options
         |> Json.Encode.object
@@ -313,11 +321,11 @@ type alias Coords =
 
 encodeCoordinates : Coords -> Value
 encodeCoordinates { topLeft, topRight, bottomRight, bottomLeft } =
-    Json.Encode.list
-        [ LngLat.encodeAsPair topLeft
-        , LngLat.encodeAsPair topRight
-        , LngLat.encodeAsPair bottomRight
-        , LngLat.encodeAsPair bottomLeft
+    Json.Encode.list LngLat.encodeAsPair
+        [ topLeft
+        , topRight
+        , bottomRight
+        , bottomLeft
         ]
 
 
@@ -338,7 +346,7 @@ image id url coordinates =
 video : Id -> List Url -> Coords -> Source
 video id urls coordinates =
     [ ( "type", Json.Encode.string "video" )
-    , ( "urls", Json.Encode.list (List.map Json.Encode.string urls) )
+    , ( "urls", Json.Encode.list Json.Encode.string urls )
     , ( "coordinates", encodeCoordinates coordinates )
     ]
         |> Json.Encode.object
