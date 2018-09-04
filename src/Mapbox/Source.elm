@@ -193,6 +193,13 @@ lineMetrics =
     Json.Encode.bool >> SourceOption "lineMetrics"
 
 
+{-| Whether to generate ids for the geojson features. When enabled, the feature.id property will be auto assigned based on its index in the features array, over-writing any previous values.
+-}
+generateId : Bool -> SourceOption GeoJSONSource
+generateId =
+    Json.Encode.bool >> SourceOption "generateId"
+
+
 {-| Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
 -}
 scheme : Scheme -> SourceOption RasterSource
